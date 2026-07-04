@@ -26,13 +26,15 @@ module.exports = async function handler(req, res) {
       }
     );
 
-    const data = await googleResponse.json();
-
-    // 4. Send Google's answer back to your frontend chat interface
-    return res.status(200).json(data);
-
-  } catch (error) {
-    console.error('Backend Error:', error);
-    return res.status(500).json({ error: 'Internal Server Error' });
-  }
-}
+        const data = await googleResponse.json();
+    
+    // Safely extract the text from Gemini's nested response
+    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response text found.";
+    
+    // Send it back to your frontend interface
+    return res.status(200).json({ reply: replyText });
+  } catch (error) {
+    console.error("Error in chat backend:", error);
+    return res.status(500).json({ error: "Internal server error." });
+  }
+};
