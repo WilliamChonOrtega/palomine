@@ -1,7 +1,19 @@
 module.exports = async function handler(req, res) {
   try {
-    // 1. Grab the user's message from the incoming request body
-    const { message } = req.body;
+    // 1. Safely handle the request parsing if req.body isn't pre-parsed
+    let message = "";
+    if (req.body && req.body.message) {
+      message = req.body.message;
+    } else if (typeof req.on === 'function') {
+      // Fallback to reading the buffer stream if req.body is undefined
+      const buffers = [];
+      for await (const chunk of req) {
+        buffers.push(chunk);
+      }
+      const data = JSON.parse(Buffer.concat(buffers).toString());
+      message = data.message;
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     // 2. Safeguard check to ensure your key is loaded
@@ -18,7 +30,7 @@ module.exports = async function handler(req, res) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: message }] }]
+          contents: [{ parts: [{ text: message || "Hi" }] }]
         }),
       }
     );
@@ -33,6 +45,7 @@ module.exports = async function handler(req, res) {
 
   } catch (error) {
     console.error("Error in chat backend:", error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    // Explicitly return a 500 error if the internal code trips up
+    return res.status(500).json({ error: 'Internal Server Error processing message.' });
   }
 };
