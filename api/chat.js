@@ -16,8 +16,7 @@ module.exports = async function handler(req, res) {
     // 3. Talk to Google Gemini securely behind the scenes
     const googleResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
+        {method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
