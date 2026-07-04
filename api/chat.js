@@ -1,64 +1,65 @@
 module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    let rawBody = "";
-
-    // 1. If req.body is already parsed by the server environment, use it
-    if (req.body) {
-      if (typeof req.body === 'object') {
-        rawBody = JSON.stringify(req.body);
-      } else {
-        rawBody = req.body;
-      }
-    } else {
-      // 2. If req.body is completely undefined, read the raw data stream manually
-      const buffers = [];
-      for await (const chunk of req) {
-        buffers.push(chunk);
-      }
-      rawBody = Buffer.concat(buffers).toString();
-    }
-
-    // 3. Extract the message out of whatever data format came in
-    let message = "Hi"; // Default fallback
-    if (rawBody) {
-      try {
-        const parsed = JSON.parse(rawBody);
-        message = parsed.message || message;
-      } catch (e) {
-        // If it isn't valid JSON, treat the entire raw input as the string message
-        message = rawBody || message;
-      }
-    }
-
     const apiKey = process.env.GEMINI_API_KEY;
+
     if (!apiKey) {
-      return res.status(500).json({ error: 'API key is missing on the server.' });
+      return res.status(500).json({ error: "Missing GEMINI_API_KEY on server." });
     }
 
-    // 4. Talk to Google Gemini securely
-    const googleResponse = await fetch(
+    const message =
+      req.body?.message ||
+      req.body?.prompt ||
+      req.body?.text ||
+      req.body?.contents?.[0]?.parts?.[0]?.text;
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({
+        error: "No valid message received from frontend.",
+        receivedBody: req.body,
+      });
+    }
+
+    const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: message }] }]
+          contents: [
+            {
+              parts: [{ text: message }],
+            },
+          ],
         }),
       }
     );
 
-    const data = await googleResponse.json();
-    
-    // 5. Safely extract the reply text
-    const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response text found.";
+    const data = await geminiResponse.json();
 
-    // 6. Return the expected payload to the frontend
-    return res.status(200).json({ reply: replyText });
+    if (!geminiResponse.ok) {
+      return res.status(geminiResponse.status).json({
+        error: "Gemini API error",
+        details: data,
+      });
+    }
 
+    const reply =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "The AI service responded, but no text was returned.";
+
+    return res.status(200).json({ reply });
   } catch (error) {
-    console.error("Error in chat backend:", error);
-    return res.status(500).json({ error: 'Internal Server Error processing message.' });
+    console.error("Chat backend error:", error);
+
+    return res.status(500).json({
+      error: "Internal server error",
+      details: error.message,
+    });
   }
 };
