@@ -1,19 +1,12 @@
-export const config = {
-  runtime: 'edge',
-};
-
-export default async function handler(req) {
+module.exports = async function handler(req, res) {
   try {
-    // 1. Parse the incoming request body
-    const { message } = await req.json();
+    // 1. Grab the user's message from the incoming request body
+    const { message } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     // 2. Safeguard check to ensure your key is loaded
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: 'API key is missing on the server.' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return res.status(500).json({ error: 'API key is missing on the server.' });
     }
 
     // 3. Talk to Google Gemini securely behind the scenes
@@ -32,20 +25,14 @@ export default async function handler(req) {
 
     const data = await googleResponse.json();
     
-    // Safely extract the text from Gemini's nested response
+    // Safely extract the text from Gemini's nested response structure
     const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "No response text found.";
 
-    // 4. Send it back to your frontend interface
-    return new Response(
-      JSON.stringify({ reply: replyText }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    // 4. Send it back to your frontend in the JSON format it expects
+    return res.status(200).json({ reply: replyText });
 
   } catch (error) {
     console.error("Error in chat backend:", error);
-    return new Response(
-      JSON.stringify({ error: 'Internal Server Error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
-}
+};
