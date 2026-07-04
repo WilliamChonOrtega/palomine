@@ -10,15 +10,11 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: "Missing GEMINI_API_KEY on server." });
     }
 
-    const message =
-      req.body?.message ||
-      req.body?.prompt ||
-      req.body?.text ||
-      req.body?.contents?.[0]?.parts?.[0]?.text;
+    const geminiPayload = req.body;
 
-    if (!message || typeof message !== "string") {
+    if (!geminiPayload || !geminiPayload.contents) {
       return res.status(400).json({
-        error: "No valid message received from frontend.",
+        error: "Invalid request body. Expected Gemini contents payload.",
         receivedBody: req.body,
       });
     }
@@ -30,13 +26,7 @@ module.exports = async function handler(req, res) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: message }],
-            },
-          ],
-        }),
+        body: JSON.stringify(geminiPayload),
       }
     );
 
@@ -49,11 +39,7 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "The AI service responded, but no text was returned.";
-
-    return res.status(200).json({ reply });
+    return res.status(200).json(data);
   } catch (error) {
     console.error("Chat backend error:", error);
 
